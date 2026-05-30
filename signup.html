@@ -79,10 +79,58 @@
             "https://api.dicebear.com/7.x/pixel-art/svg?seed=Mike"
         ];
 
-        document.getElementById('signupForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const status = document.getElementById('status');
-            const emailInput = document.getElementById('email').value;
+       document.getElementById('signupForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const status = document.getElementById('status');
+    const emailInput = document.getElementById('email').value;
+
+    // --- نظام الـ Rate Limit لحماية الموقع من خويك ---
+    const NOW = Date.now();
+    const LAST_REQUEST = localStorage.getItem('last_signup_request');
+    const COOLDOWN_TIME = 60000; // الوقت بالملي ثانية (60000 تعني دقيقة كاملة)
+
+    if (LAST_REQUEST && (NOW - LAST_REQUEST < COOLDOWN_TIME)) {
+        const timeLeft = Math.ceil((COOLDOWN_TIME - (NOW - LAST_REQUEST)) / 1000);
+        status.style.color = "#ff4444";
+        status.innerText = `Calm down bro! Please wait ${timeLeft} seconds before trying again.`;
+        return; // يقفل الدالة فوراً ومستحيل يرسل للسوبابيز أو إيميل جي إس
+    }
+    // --------------------------------------------------
+
+    status.style.color = "#52FF52";
+    status.innerText = "Checking if email exists...";
+
+    try {
+        // فحص مسبق في Supabase لمنع تكرار الحسابات
+        const { data: existingUser } = await supabaseClient.from('accounts').select('email').eq('email', emailInput).maybeSingle();
+        if (existingUser) {
+            status.style.color = "#ff4444";
+            status.innerText = "Email already registered!";
+            return;
+        }
+
+        status.innerText = "Sending code to your email...";
+        generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // إرسال الكود عبر EmailJS
+        await emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", {
+            email: emailInput,
+            passcode: generatedCode
+        });
+
+        // إذا نجح الإرسال، نسجل وقت الطلب بالمتصفح عشان يبدأ الـ Cooldown
+        localStorage.setItem('last_signup_request', NOW);
+
+        document.getElementById('signupForm').style.display = "none";
+        document.getElementById('verifySection').style.display = "block";
+        status.innerText = "Code sent! Please check your inbox.";
+
+    } catch (err) {
+        status.style.color = "#ff4444";
+        status.innerText = "Something went wrong. Try again!";
+        console.error(err);
+    }
+};
 
             status.style.color = "#52FF52";
             status.innerText = "Checking if email exists...";
