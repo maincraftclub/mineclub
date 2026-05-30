@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MineClub | Sign Up</title>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Press+Start+2P&display=swap');
         
         body { 
             margin: 0; 
             background-color: #0b0f19;
+            /* نقشة الخطوط شبه المخفية الفخمة */
             background-image: 
                 linear-gradient(rgba(82, 255, 82, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(82, 255, 82, 0.03) 1px, transparent 1px);
@@ -22,26 +24,37 @@
         .box { 
             background: rgba(15, 23, 42, 0.8);
             padding: 30px; border-radius: 20px; 
-            border: 1px solid rgba(82, 255, 82, 0.2);
-            width: 380px; text-align: center; 
+            border: 1px solid rgba(82, 255, 82, 0.3); /* توهج أخضر خفيف للحواف */
+            width: 400px; text-align: center; 
             backdrop-filter: blur(10px);
-            box-shadow: 0 0 30px rgba(82, 255, 82, 0.1);
+            box-shadow: 0 0 30px rgba(82, 255, 82, 0.15);
         }
 
-        .title { font-family: 'Press Start 2P', cursive; color: #52FF52; font-size: 16px; margin-bottom: 25px; }
+        .title { font-family: 'Press Start 2P', cursive; color: #52FF52; font-size: 16px; margin-bottom: 25px; text-transform: uppercase; }
         label { display: block; text-align: left; font-size: 11px; color: #52FF52; margin: 0 0 5px 5px; font-weight: bold; }
 
-        input { 
+        input, select { 
             width: 100%; padding: 12px; margin-bottom: 12px; 
             background: rgba(0, 0, 0, 0.6); border: 1px solid #334155; 
             color: #fff; border-radius: 8px; box-sizing: border-box; outline: none; transition: 0.3s;
+            font-family: 'Roboto', sans-serif;
         }
-        input:focus { border-color: #52FF52; box-shadow: 0 0 10px rgba(82,255,82,0.3); }
+        input:focus, select:focus { border-color: #52FF52; box-shadow: 0 0 10px rgba(82,255,82,0.3); }
         
-        input[type="date"] { color-scheme: dark; cursor: pointer; text-transform: uppercase; }
+        /* تقسيم حاوية تاريخ الميلاد المنسدلة */
+        .dob-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .dob-container select {
+            margin-bottom: 0;
+            cursor: pointer;
+            color-scheme: dark; /* يخلي القائمة سوداء متناسقة مع الثيم */
+        }
 
         .btn { 
-            width: 100%; background: #52FF52; color: #000; border: none; padding: 13px; 
+            width: 100%; background: #52FF52; color: #000; border: none; padding: 14px; 
             border-radius: 8px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s;
         }
         .btn:hover { background: #fff; transform: translateY(-2px); }
@@ -53,17 +66,41 @@
 <body>
 
     <div class="box">
-        <h2 class="title">SIGN UP</h2>
+        <h2 class="title">Create Account</h2>
         
         <form id="signupForm">
             <input type="text" id="fname" placeholder="Full Name" required>
             
-            <label>BIRTH DATE (YYYY-MM-DD):</label>
-            <input type="date" id="dob" required>
+            <label>BIRTH DATE:</label>
+            <div class="dob-container">
+                <select id="dob-day" required>
+                    <option value="" disabled selected>Day</option>
+                </select>
+                
+                <select id="dob-month" required>
+                    <option value="" disabled selected>Month</option>
+                    <option value="01">01 - January</option>
+                    <option value="02">02 - February</option>
+                    <option value="03">03 - March</option>
+                    <option value="04">04 - April</option>
+                    <option value="05">05 - May</option>
+                    <option value="06">06 - June</option>
+                    <option value="07">07 - July</option>
+                    <option value="08">08 - August</option>
+                    <option value="09">09 - September</option>
+                    <option value="10">10 - October</option>
+                    <option value="11">11 - November</option>
+                    <option value="12">12 - December</option>
+                </select>
+                
+                <select id="dob-year" required>
+                    <option value="" disabled selected>Year</option>
+                </select>
+            </div>
             
             <input type="email" id="email" placeholder="Email Address" required>
             <input type="password" id="pass" placeholder="Password" required>
-            <button type="submit" class="btn">Send Code</button>
+            <button type="submit" class="btn">Send Verification Code</button>
         </form>
 
         <div id="verifySection">
@@ -75,41 +112,54 @@
     </div>
 
     <script>
-        // قفل التاريخ: يمنع اختيار أي تاريخ بالمستقبل (زي سنة 6000)
-        const dobInput = document.getElementById('dob');
-        const today = new Date().toISOString().split('T')[0];
-        dobInput.setAttribute('max', today);
+        // توليد الأيام تلقائياً (01 إلى 31)
+        const daySelect = document.getElementById('dob-day');
+        for (let d = 1; d <= 31; d++) {
+            let val = d < 10 ? '0' + d : d;
+            daySelect.innerHTML += `<option value="${val}">${val}</option>`;
+        }
 
-        // تفعيل EmailJS - حط الـ Public Key تبعك هون
-        emailjs.init("gWPVwp_AdEm3E6skj"); 
+        // توليد السنوات تلقائياً (من 2026 ونزولاً إلى 1950) مستحيل يكتب 6000!
+        const yearSelect = document.getElementById('dob-year');
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= 1950; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+
+        // ربط الـ Supabase والـ EmailJS بالبيانات الخاصة بك
+        const SUPABASE_URL = "رابط_مشروعك_هنا"; 
+        const SUPABASE_ANON_KEY = "الـ_Publishable_key_الخاص_بك_هنا"; 
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); 
 
         let generatedCode = ""; 
-        // افاتارات عشوائية مجهزة للاعضاء
         const avatars = [
             "https://i.ibb.co/Xz9S0m4/av1.png", "https://i.ibb.co/M9fK5z1/av2.png",
             "https://i.ibb.co/PZ0v3Y9/av3.png", "https://i.ibb.co/vD7H8Gz/av4.png"
         ];
 
-        document.getElementById('signupForm').onsubmit = function(e) {
+        document.getElementById('signupForm').onsubmit = async function(e) {
             e.preventDefault();
             const status = document.getElementById('status');
-            
-            // فحص إضافي للسنة بالـ JS لمنع أي تلاعب
-            const birthYear = new Date(dobInput.value).getFullYear();
-            if (birthYear > new Date().getFullYear() || birthYear < 1900) {
-                alert("Please enter a valid birth year!");
+            const emailInput = document.getElementById('email').value;
+
+            status.style.color = "#52FF52";
+            status.innerText = "Checking if email exists...";
+
+            // فحص مسبق في Supabase لمنع تكرار الحسابات
+            const { data: existingUser } = await _supabase.from('accounts').select('email').eq('email', emailInput).single();
+            if (existingUser) {
+                status.style.color = "#ff4444";
+                status.innerText = "Email already registered!";
                 return;
             }
 
-            status.style.color = "#52FF52";
             status.innerText = "Sending code to your email...";
-
-            // توليد كود من 6 ارقام
             generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-            // إرسال عبر EmailJS
-            emailjs.send("service_ecugym9", "template_tx3zt38", {
-                email: document.getElementById('email').value,
+            emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", {
+                email: emailInput,
                 passcode: generatedCode
             }).then(() => {
                 document.getElementById('signupForm').style.display = "none";
@@ -117,12 +167,11 @@
                 status.innerText = "Code sent! Please check your inbox.";
             }).catch((err) => {
                 status.style.color = "#ff4444";
-                status.innerText = "Failed to send code. Check EmailJS setup!";
-                console.error(err);
+                status.innerText = "Failed to send verification code.";
             });
         };
 
-        // زر التاكيد النهائي والحفظ بـ Firebase
+        // عند كتابة الكود الصحيح، يتم الحفظ في Supabase فوراً
         document.getElementById('verifyBtn').onclick = async function() {
             const inputCode = document.getElementById('vCode').value;
             const status = document.getElementById('status');
@@ -130,30 +179,27 @@
             if (inputCode === generatedCode) {
                 status.innerText = "Creating account...";
 
-                const userData = {
+                const year = document.getElementById('dob-year').value;
+                const month = document.getElementById('dob-month').value;
+                const day = document.getElementById('dob-day').value;
+
+                const { error } = await _supabase.from('accounts').insert([{
                     name: document.getElementById('fname').value,
-                    dob: document.getElementById('dob').value,
+                    dob: `${year}-${month}-${day}`, // تنسيق تاريخ سليم 100% لتخزينه بقاعدة البيانات
                     email: document.getElementById('email').value,
                     password: document.getElementById('pass').value,
-                    avatar: avatars[Math.floor(Math.random() * avatars.length)] // اختيار افاتار عشوائي للرجال
-                };
+                    avatar: avatars[Math.floor(Math.random() * avatars.length)]
+                }]);
 
-                try {
-                    // الحفظ في قاعدة بيانات Firebase الخاصة بك
-                    await fetch("https://minecore2026-default-rtdb.firebaseio.com/accounts.json", {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(userData)
-                    });
-
-                    alert("Registration Successful!");
-                    window.location.href = "login.html"; // حوله لصفحة تسجيل الدخول
-                } catch (error) {
+                if (!error) {
+                    alert("Account Created Successfully!");
+                    window.location.href = "login.html";
+                } else {
                     status.style.color = "#ff4444";
-                    status.innerText = "Database Error!";
+                    status.innerText = "Error: " + error.message;
                 }
             } else {
-                alert("Incorrect verification code!");
+                alert("Incorrect code! Please try again.");
             }
         };
     </script>
